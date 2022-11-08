@@ -145,14 +145,9 @@ impl ReliableSender {
             // Wait until we are using less than 95% of the bandwidth
             loop {
                 let usage = *self.bandwidth_usage.lock().await;
-                info!("Bandwidth usage: {} / {}", usage, TARGET_BANDWIDTH);
                 if usage < TARGET_BANDWIDTH * 0.95 {
                     break;
                 }
-                info!(
-                    "Sleeping for {}ms",
-                    (data.len() as f64 * 1000.0 / TARGET_BANDWIDTH) as u64
-                );
                 sleep(Duration::from_millis(
                     (data.len() as f64 * 1000.0 / TARGET_BANDWIDTH) as u64,
                 ))
