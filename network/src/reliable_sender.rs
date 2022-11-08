@@ -11,11 +11,15 @@ use std::cmp::min;
 use std::collections::{HashMap, VecDeque};
 use std::fmt::Debug;
 use std::net::SocketAddr;
+use std::sync::Arc;
+use sysinfo::{NetworkExt, NetworksExt, System, SystemExt};
 use tokio::net::TcpStream;
 use tokio::sync::mpsc::{channel, Receiver, Sender};
-use tokio::sync::oneshot;
+use tokio::sync::{oneshot, Mutex};
 use tokio::time::{sleep, Duration};
 use tokio_util::codec::{Framed, LengthDelimitedCodec};
+
+const TARGET_BANDWIDTH: f64 = 1_000_000_000.0; // bps
 
 #[cfg(test)]
 #[path = "tests/reliable_sender_tests.rs"]
@@ -33,6 +37,8 @@ pub struct ReliableSender {
     connections: HashMap<SocketAddr, Sender<InnerMessage>>,
     /// Small RNG just used to shuffle nodes and randomize connections (not crypto related).
     rng: SmallRng,
+    /// Current bandwidth usage (in bytes per second).
+    bandwidth_usage: Arc<Mutex<f64>>,
 }
 
 impl std::default::Default for ReliableSender {
@@ -41,11 +47,65 @@ impl std::default::Default for ReliableSender {
     }
 }
 
+struct BandwidthEstimator {
+    /// Update frequency,
+    update_frequency: Duration,
+    /// Sender to the ReliableSender.
+    bandwidth_sender: Sender<f64>,
+}
+
+fn transmitted(system: &System) -> f64 {
+    system
+        .networks()
+        .iter()
+        .fold(0.0, |acc, (_, net)| acc + net.total_transmitted() as f64)
+}
+
+impl BandwidthEstimator {
+    fn new(update_frequency: Duration, bandwidth_sender: Sender<f64>) -> Self {
+        Self {
+            update_frequency,
+            bandwidth_sender,
+        }
+    }
+
+    async fn run(&mut self) {
+        let mut system = System::new_all();
+        let mut last = transmitted(&system);
+        loop {
+            sleep(self.update_frequency).await;
+            system.refresh_networks();
+            let now = transmitted(&system);
+            let bandwidth = (now - last) / self.update_frequency.as_secs_f64();
+            last = now;
+            if let Err(e) = self.bandwidth_sender.send(bandwidth).await {
+                warn!("Bandwidth estimator failed to send bandwidth: {:?}", e);
+            }
+        }
+    }
+}
+
 impl ReliableSender {
     pub fn new() -> Self {
+        let (tx, mut rx): (Sender<f64>, Receiver<f64>) = channel(1);
+        let usage = Arc::new(Mutex::new(0.0));
+        let usage_clone = usage.clone();
+        let update_frequency = Duration::from_secs(1);
+
+        tokio::spawn(async move { BandwidthEstimator::new(update_frequency, tx).run().await });
+
+        tokio::spawn(async move {
+            loop {
+                if let Some(bandwidth) = rx.recv().await {
+                    *usage_clone.lock().await = bandwidth;
+                }
+            }
+        });
+
         Self {
             connections: HashMap::new(),
             rng: SmallRng::from_entropy(),
+            bandwidth_usage: usage,
         }
     }
 
@@ -82,6 +142,22 @@ impl ReliableSender {
         for address in addresses {
             let handler = self.send(address, data.clone()).await;
             handlers.push(handler);
+            // Wait until we are using less than 95% of the bandwidth
+            loop {
+                let usage = *self.bandwidth_usage.lock().await;
+                info!("Bandwidth usage: {} / {}", usage, TARGET_BANDWIDTH);
+                if usage < TARGET_BANDWIDTH * 0.95 {
+                    break;
+                }
+                info!(
+                    "Sleeping for {}ms",
+                    (data.len() as f64 * 1000.0 / TARGET_BANDWIDTH) as u64
+                );
+                sleep(Duration::from_millis(
+                    (data.len() as f64 * 1000.0 / TARGET_BANDWIDTH) as u64,
+                ))
+                .await;
+            }
         }
         handlers
     }

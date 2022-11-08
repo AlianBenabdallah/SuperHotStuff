@@ -60,7 +60,7 @@ def local(ctx):
         'rate': 40000,
         'tx_size': 512,
         'duration': 20,
-        'topology': 'binomial',
+        'topology': 'fullmesh',
     }
     node_params = {
         'consensus': {
@@ -144,13 +144,13 @@ def remote(ctx):
         'faults': 0,
         'nodes': [10],
         'clients': 1,  # Must be the same length as nodes or an integer
-        'rate': [100_000],
+        'rate': [150_000],
         'tx_size': 512,
         'duration': 30,
         'runs': 1,
-        'topology': 'binomial',
+        'topology': 'fullmesh',
         'latency': 0,
-        'bandwidth': "500",
+        'bandwidth': "",
     }
     node_params = {
         'consensus': {
@@ -161,7 +161,7 @@ def remote(ctx):
             'gc_depth': 50,
             'sync_retry_delay': 5_000,
             'sync_retry_nodes': 3,
-            'batch_size': 1_000_000,
+            'batch_size': 500_000,
             'max_batch_delay': 100,
             'fanout' : 3,
         }
