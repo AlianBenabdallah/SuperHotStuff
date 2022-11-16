@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use bytes::Bytes;
 use crypto::{Digest, PublicKey};
 use futures::future::join_all;
@@ -12,9 +14,6 @@ use crate::{mempool::MempoolMessage, Committee, Topology};
 #[path = "tests/processor_tests.rs"]
 pub mod processor_tests;
 
-/// Indicates a serialized `MempoolMessage::Batch` message.
-pub type SerializedBatchMessage = Vec<u8>;
-
 /// Hashes and stores batches, it then outputs the batch's digest.
 pub struct Processor<T: Topology> {
     /// The public key of this authority.
@@ -28,7 +27,7 @@ pub struct Processor<T: Topology> {
     /// Network topology
     topology: T,
     /// Input channel to receive batches
-    rx_batch: Receiver<(SerializedBatchMessage, Digest, PublicKey)>,
+    rx_batch: Receiver<(Arc<Bytes>, Digest, PublicKey)>,
     /// Output channel to send the batches' digest to consensus
     tx_digest: Sender<Digest>,
 }
@@ -41,7 +40,7 @@ impl<T: Topology + Send + Sync + 'static> Processor<T> {
         // The persistent storage.
         store: Store,
         // Input channel to receive batches.
-        rx_batch: Receiver<(SerializedBatchMessage, Digest, PublicKey)>,
+        rx_batch: Receiver<(Arc<Bytes>, Digest, PublicKey)>,
         // Output channel to send out batches' digests.
         tx_digest: Sender<Digest>,
         // Network topology
@@ -64,17 +63,17 @@ impl<T: Topology + Send + Sync + 'static> Processor<T> {
 
     async fn run(&mut self) {
         while let Some((batch, digest, source)) = self.rx_batch.recv().await {
-            self.store.write(digest.to_vec(), batch.clone()).await;
+            self.store.write(digest.to_vec(), batch.to_vec()).await;
             if source != self.name {
                 // If peer is not the current node then the message was received by another peer and should be ack'd then relayed.
                 let source_addr = self
                     .committee
                     .mempool_address(&source)
                     .expect("Did not find source");
-                let payload = Bytes::from(
+                let ack = Arc::new(Bytes::from(
                     bincode::serialize(&MempoolMessage::Ack((self.name, digest.clone()))).unwrap(),
-                );
-                let handler = self.network.send(source_addr, payload).await;
+                ));
+                let handler = self.network.send(source_addr, ack).await;
                 debug!("Sent Ack to {} for batch {}", source_addr, &digest);
                 // Await the handlers
                 tokio::spawn(async { handler.await });

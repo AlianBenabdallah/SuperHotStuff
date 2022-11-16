@@ -56,8 +56,8 @@ def local(ctx):
     bench_params = {
         'faults': 0,
         'nodes': 10,
-        'clients': 2,  # Must be the same length as nodes or an integer
-        'rate': 10000,
+        'clients': 1,  # Must be the same length as nodes or an integer
+        'rate': 100000,
         'tx_size': 512,
         'duration': 20,
         'topology': 'fullmesh',
@@ -84,7 +84,7 @@ def local(ctx):
 
 
 @task
-def create(ctx, nodes=20):
+def create(ctx, nodes=29):
     ''' Create a testbed'''
     try:
         InstanceManager.make().create_instances(nodes)
@@ -102,7 +102,7 @@ def destroy(ctx):
 
 
 @task
-def start(ctx, max=30):
+def start(ctx, max=28):
     ''' Start at most `max` machines per data center '''
     try:
         InstanceManager.make().start_instances(max)
@@ -142,12 +142,12 @@ def remote(ctx):
     ''' Run benchmarks on AWS '''
     bench_params = {
         'faults': 0,
-        'nodes': 30,
+        'nodes': 29,
         'clients': 1,  # Must be the same length as nodes or an integer
         'rate': [100_000],
         'tx_size': 512,
         'duration': 30,
-        'runs': 1,
+        'runs': 2,
         'topology': 'fullmesh',
         'latency': 0,
         'bandwidth': "",
@@ -161,7 +161,7 @@ def remote(ctx):
             'gc_depth': 50,
             'sync_retry_delay': 5_000,
             'sync_retry_nodes': 3,
-            'batch_size': 1_000_000,
+            'batch_size': 500_000,
             'max_batch_delay': 100,
             'fanout' : 3,
         }

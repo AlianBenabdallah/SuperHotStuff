@@ -12,7 +12,7 @@ async fn send() {
 
     // Make the network sender and send the message.
     let mut sender = ReliableSender::new();
-    let cancel_handler = sender.send(address, Bytes::from(message)).await;
+    let cancel_handler = sender.send(address, Arc::new(Bytes::from(message))).await;
 
     // Ensure we get back an acknowledgement.
     assert!(cancel_handler.await.is_ok());
@@ -38,7 +38,9 @@ async fn broadcast() {
 
     // Make the network sender and send the message.
     let mut sender = ReliableSender::new();
-    let cancel_handlers = sender.broadcast(addresses, Bytes::from(message)).await;
+    let cancel_handlers = sender
+        .broadcast(addresses, Arc::new(Bytes::from(message)))
+        .await;
 
     // Ensure we get back an acknowledgement for each message.
     assert!(try_join_all(cancel_handlers).await.is_ok());
@@ -53,7 +55,7 @@ async fn retry() {
     let address = "127.0.0.1:5300".parse::<SocketAddr>().unwrap();
     let message = "Hello, world!";
     let mut sender = ReliableSender::new();
-    let cancel_handler = sender.send(address, Bytes::from(message)).await;
+    let cancel_handler = sender.send(address, Arc::new(Bytes::from(message))).await;
 
     // Run a TCP server.
     sleep(Duration::from_millis(50)).await;

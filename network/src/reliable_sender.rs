@@ -11,6 +11,7 @@ use std::cmp::min;
 use std::collections::{HashMap, VecDeque};
 use std::fmt::Debug;
 use std::net::SocketAddr;
+use std::sync::Arc;
 use tokio::net::TcpStream;
 use tokio::sync::mpsc::{channel, Receiver, Sender};
 use tokio::sync::oneshot;
@@ -57,7 +58,7 @@ impl ReliableSender {
     }
 
     /// Reliably send a message to a specific address.
-    pub async fn send(&mut self, address: SocketAddr, data: Bytes) -> CancelHandler {
+    pub async fn send(&mut self, address: SocketAddr, data: Arc<Bytes>) -> CancelHandler {
         let (sender, receiver) = oneshot::channel();
         self.connections
             .entry(address)
@@ -76,7 +77,7 @@ impl ReliableSender {
     pub async fn broadcast(
         &mut self,
         addresses: Vec<SocketAddr>,
-        data: Bytes,
+        data: Arc<Bytes>,
     ) -> Vec<CancelHandler> {
         let mut handlers = Vec::new();
         for address in addresses {
@@ -91,7 +92,7 @@ impl ReliableSender {
     pub async fn lucky_broadcast(
         &mut self,
         mut addresses: Vec<SocketAddr>,
-        data: Bytes,
+        data: Arc<Bytes>,
         nodes: usize,
     ) -> Vec<CancelHandler> {
         addresses.shuffle(&mut self.rng);
@@ -104,7 +105,7 @@ impl ReliableSender {
 #[derive(Debug)]
 struct InnerMessage {
     /// The data to transmit.
-    data: Bytes,
+    data: Arc<Bytes>,
     /// The cancel handler allowing the caller task to cancel the transmission of this message
     /// and to be notified of its successfully transmission.
     cancel_handler: oneshot::Sender<Bytes>,
@@ -119,7 +120,7 @@ struct Connection {
     /// The initial delay to wait before re-attempting a connection (in ms).
     retry_delay: u64,
     /// Buffer keeping all messages that need to be re-transmitted.
-    buffer: VecDeque<(Bytes, oneshot::Sender<Bytes>)>,
+    buffer: VecDeque<(Arc<Bytes>, oneshot::Sender<Bytes>)>,
 }
 
 impl Connection {
@@ -197,7 +198,7 @@ impl Connection {
                 }
 
                 // Try to send the message.
-                match writer.send(data.clone()).await {
+                match writer.send((*data).clone()).await {
                     Ok(()) => {
                         // The message has been sent, we remove it from the buffer and add it to
                         // `pending_replies` while we wait for an ACK.

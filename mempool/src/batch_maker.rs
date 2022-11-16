@@ -1,5 +1,5 @@
 use crate::mempool::MempoolMessage;
-use crate::processor::SerializedBatchMessage;
+use bytes::Bytes;
 #[cfg(feature = "benchmark")]
 use crypto::Digest;
 use crypto::PublicKey;
@@ -10,6 +10,7 @@ use log::info;
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "benchmark")]
 use std::convert::TryInto as _;
+use std::sync::Arc;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::time::{sleep, Duration, Instant};
 
@@ -38,7 +39,7 @@ pub struct BatchMaker {
     /// Channel to receive transactions from the network.
     rx_transaction: Receiver<Transaction>,
     /// Output channel to deliver sealed batches to the `QuorumWaiter`.
-    tx_message: Sender<SerializedBatchMessage>,
+    tx_message: Sender<Arc<Bytes>>,
     /// Holds the current batch.
     current_batch: Batch,
     /// Holds the size of the current batch (in bytes).
@@ -51,7 +52,7 @@ impl BatchMaker {
         batch_size: usize,
         max_batch_delay: u64,
         rx_transaction: Receiver<Transaction>,
-        tx_message: Sender<SerializedBatchMessage>,
+        tx_message: Sender<Arc<Bytes>>,
     ) {
         tokio::spawn(async move {
             Self {
@@ -146,7 +147,7 @@ impl BatchMaker {
         }
         // Send the batch through the deliver channel for further processing.
         self.tx_message
-            .send(serialized)
+            .send(Arc::new(Bytes::from(serialized)))
             .await
             .expect("Failed to deliver batch");
     }

@@ -1,5 +1,4 @@
 use crate::config::{Committee, Stake};
-use crate::processor::SerializedBatchMessage;
 use bytes::Bytes;
 use crypto::{Digest, PublicKey};
 use futures::future::join_all;
@@ -9,6 +8,7 @@ use log::{debug, info};
 use network::ReliableSender;
 use std::collections::{HashMap, HashSet};
 use std::net::SocketAddr;
+use std::sync::Arc;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::time::{sleep, Duration};
 
@@ -25,9 +25,9 @@ pub struct QuorumWaiter {
     /// The stake of this authority.
     stake: Stake,
     /// Input Channel to receive commands.
-    rx_message: Receiver<SerializedBatchMessage>,
+    rx_message: Receiver<Arc<Bytes>>,
     /// Channel to deliver batches for which we have enough acknowledgements.
-    tx_batch: Sender<(SerializedBatchMessage, Digest, PublicKey)>,
+    tx_batch: Sender<(Arc<Bytes>, Digest, PublicKey)>,
     /// Channel to receive acknowledgements from the network.
     rx_ack: Receiver<(PublicKey, Digest)>,
     /// The network addresses of the other mempools.
@@ -39,7 +39,7 @@ pub struct QuorumWaiter {
 }
 struct BlockInProcess {
     stake: u32,
-    block: Vec<u8>,
+    block: Arc<Bytes>,
     acks: HashSet<PublicKey>,
 }
 
@@ -60,8 +60,8 @@ impl QuorumWaiter {
         name: PublicKey,
         committee: Committee,
         stake: Stake,
-        rx_message: Receiver<SerializedBatchMessage>,
-        tx_batch: Sender<(SerializedBatchMessage, Digest, PublicKey)>,
+        rx_message: Receiver<Arc<Bytes>>,
+        tx_batch: Sender<(Arc<Bytes>, Digest, PublicKey)>,
         rx_ack: Receiver<(PublicKey, Digest)>,
         mempool_addresses: Vec<SocketAddr>,
         indirect_peers: Vec<(PublicKey, SocketAddr)>,
@@ -102,7 +102,7 @@ impl QuorumWaiter {
 
                     let handlers = self
                         .network
-                        .broadcast(self.mempool_addresses.clone(), Bytes::from(batch))
+                        .broadcast(self.mempool_addresses.clone(), batch)
                         .await;
                     my_block_queue.push(wait_block(INDIRECT_PEERS_TIMEOUT, (digest, 0)));
 
@@ -137,7 +137,7 @@ impl QuorumWaiter {
                                 // Send the batch to the indirect peer
                                 let handler = self
                                     .network
-                                    .send(address, Bytes::from(block_in_process.block.clone()))
+                                    .send(address, block_in_process.block.clone())
                                     .await;
                                 // Spawn a new task to wait for the handlers
                                 tokio::spawn(async move { handler.await });

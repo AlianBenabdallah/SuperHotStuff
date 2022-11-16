@@ -1,7 +1,7 @@
 use crate::batch_maker::{BatchMaker, BatchWithSender, Transaction};
 use crate::config::{Committee, Parameters};
 use crate::helper::Helper;
-use crate::processor::{Processor, SerializedBatchMessage};
+use crate::processor::Processor;
 use crate::quorum_waiter::QuorumWaiter;
 use crate::synchronizer::Synchronizer;
 use crate::topologies::types::CacheTopology;
@@ -16,6 +16,7 @@ use network::{MessageHandler, Receiver as NetworkReceiver, Writer};
 use serde::{Deserialize, Serialize};
 use std::error::Error;
 use std::net::SocketAddr;
+use std::sync::Arc;
 use store::Store;
 use tokio::sync::mpsc::{channel, Receiver, Sender};
 
@@ -261,7 +262,7 @@ impl MessageHandler for TxReceiverHandler {
 #[derive(Clone)]
 struct MempoolReceiverHandler {
     tx_helper: Sender<(Vec<Digest>, PublicKey)>,
-    tx_processor: Sender<(SerializedBatchMessage, Digest, PublicKey)>,
+    tx_processor: Sender<(Arc<Bytes>, Digest, PublicKey)>,
     tx_ack: Sender<(PublicKey, Digest)>,
 }
 
@@ -276,7 +277,7 @@ impl MessageHandler for MempoolReceiverHandler {
                 // Send the batch to the digest processor.
                 let digest = Digest::hash(&serialized);
                 self.tx_processor
-                    .send((serialized.to_vec(), digest, batch_with_sender.sender))
+                    .send((Arc::new(serialized), digest, batch_with_sender.sender))
                     .await
                     .expect("Failed to send batch");
             }

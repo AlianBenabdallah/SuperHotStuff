@@ -8,6 +8,7 @@ use futures::stream::StreamExt as _;
 use log::{debug, info};
 use network::{CancelHandler, ReliableSender};
 use std::collections::HashSet;
+use std::sync::Arc;
 use tokio::sync::mpsc::{Receiver, Sender};
 
 #[derive(Debug)]
@@ -93,7 +94,7 @@ impl Proposer {
             .expect("Failed to serialize block");
         let handles = self
             .network
-            .broadcast(addresses, Bytes::from(message))
+            .broadcast(addresses, Arc::new(Bytes::from(message)))
             .await;
 
         // Send our block to the core for processing.

@@ -130,10 +130,9 @@ class InstanceManager:
     def _get_ami(self, client):
         # The AMI changes with regions.
         response = client.describe_images(
-            Filters=[{
-                'Name': 'description',
-                'Values': ['Canonical, Ubuntu, 20.04 LTS, arm64 focal image build on 2022-09-14']
-            }]
+            ImageIds=[
+                'ami-00266f51b6b22db58',
+            ],
         )
         return response['Images'][0]['ImageId']
 
