@@ -13,15 +13,15 @@ from benchmark.remote import Bench, BenchError
 def docker(ctx):
     """run a benchmark on docker"""
     bench_params = {
-        'faults': 0,                    # Number of faults
-        'nodes': 30,                    # Number of nodes
-        'clients': 1,                   # Number of clients
-        'rate': [30000],                # Total rate of transactions per second
-        'tx_size': 512,                 # Transaction size in bytes
-        'duration': 20,                 # Duration in s
-        'latency': 10,                  # Latency in ms
-        'bandwidth': "1000",            # Bandwidth in Mbps
-        'topology': 'binomial',         # 'kauri', 'fullmesh', 'binomial'
+        'faults': 0,                     # Number of faults
+        'nodes': 10,                     # Number of nodes
+        'clients': 1,                    # Number of clients
+        'rate': [50000],                # Total rate of transactions per second
+        'tx_size': 512,                  # Transaction size in bytes
+        'duration': 60,                  # Duration in s
+        'latency': 0,                    # Latency in ms
+        'bandwidth': "",                 # Bandwidth in Mbps
+        'topology': 'binomial',          # 'kauri', 'fullmesh', 'binomial'
     }
     node_params = {
         'consensus': {
@@ -57,9 +57,9 @@ def local(ctx):
         'faults': 0,
         'nodes': 10,
         'clients': 1,  # Must be the same length as nodes or an integer
-        'rate': 150000,
+        'rate': 50000,
         'tx_size': 512,
-        'duration': 120,
+        'duration': 60,
         'topology': 'fullmesh',
     }
     node_params = {
