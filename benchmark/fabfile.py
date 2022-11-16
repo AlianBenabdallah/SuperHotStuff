@@ -57,9 +57,9 @@ def local(ctx):
         'faults': 0,
         'nodes': 10,
         'clients': 1,  # Must be the same length as nodes or an integer
-        'rate': 100000,
+        'rate': 150000,
         'tx_size': 512,
-        'duration': 20,
+        'duration': 120,
         'topology': 'fullmesh',
     }
     node_params = {
@@ -71,8 +71,8 @@ def local(ctx):
             'gc_depth': 50,
             'sync_retry_delay': 5_000,
             'sync_retry_nodes': 3,
-            'batch_size': 15_000,
-            'max_batch_delay': 10,
+            'batch_size': 500_000,
+            'max_batch_delay': 50,
             'fanout': 3,
         }
     }
