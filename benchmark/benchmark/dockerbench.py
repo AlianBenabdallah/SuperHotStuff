@@ -85,7 +85,7 @@ class DockerBench:
         cmd = [delete_logs, f'({CommandMaker.kill()} || true)']
         cmd = docker_cmd(' && '.join(cmd))
         for container in self.docker_client.containers.list():
-            container.exec_run(cmd)
+            container.exec_run(docker_cmd(cmd))
     
     def _config(self, hosts, node_parameters):
         Print.info('Generating configuration files...')
@@ -114,7 +114,7 @@ class DockerBench:
         for container in self.docker_client.containers.list():
             # Cleanup all nodes.
             cmd = f'{CommandMaker.cleanup()} || true'
-            container.exec_run(cmd)
+            container.exec_run(docker_cmd(cmd))
             # Create alias for the client and nodes binary.
             cmd = CommandMaker.alias_binaries(PathMaker.binary_path())
             container.exec_run(docker_cmd(cmd))
