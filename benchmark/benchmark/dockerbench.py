@@ -245,8 +245,9 @@ class DockerBench:
             f'(cd /{self.settings["repo_name"]} && git checkout -f {self.settings["branch"]})',
             f'(cd /{self.settings["repo_name"]} && git pull -f)',
             f'(cd /{self.settings["repo_name"]}/node && {CommandMaker.compile()})',
+            'cd /',
             CommandMaker.alias_binaries(
-                f'./{self.settings["repo_name"]}/target/release/'
+                f'/{self.settings["repo_name"]}/target/release/'
             )
         ]
         def task(container):
