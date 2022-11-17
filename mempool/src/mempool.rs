@@ -11,7 +11,7 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use crypto::{Digest, PublicKey};
 use futures::sink::SinkExt as _;
-use log::{info, warn};
+use log::{debug, info, warn};
 use network::{MessageHandler, Receiver as NetworkReceiver, Writer};
 use serde::{Deserialize, Serialize};
 use std::error::Error;
@@ -247,6 +247,10 @@ struct TxReceiverHandler {
 impl MessageHandler for TxReceiverHandler {
     async fn dispatch(&self, _writer: &mut Writer, message: Bytes) -> Result<(), Box<dyn Error>> {
         // Send the transaction to the batch maker.
+        debug!(
+            "tx_batch_maker capacity {:?}",
+            self.tx_batch_maker.capacity()
+        );
         self.tx_batch_maker
             .send(message.to_vec())
             .await
@@ -276,6 +280,7 @@ impl MessageHandler for MempoolReceiverHandler {
             Ok(MempoolMessage::Batch(batch_with_sender)) => {
                 // Send the batch to the digest processor.
                 let digest = Digest::hash(&serialized);
+                debug!("tx_processor capacity {:?}", self.tx_processor.capacity());
                 self.tx_processor
                     .send((Arc::new(serialized), digest, batch_with_sender.sender))
                     .await
@@ -287,6 +292,7 @@ impl MessageHandler for MempoolReceiverHandler {
                 .await
                 .expect("Failed to send batch request"),
             Ok(MempoolMessage::Ack((peer, digest))) => {
+                debug!("tx_ack capacity {:?}", self.tx_ack.capacity());
                 self.tx_ack
                     .send((peer, digest))
                     .await
