@@ -249,12 +249,14 @@ class DockerBench:
                 f'./{self.settings["repo_name"]}/target/release/'
             )
         ]
+        def task(container):
+            for c in cmd:
+                container.exec_run(docker_cmd(c))
         # Run the command in all containers in parallel.
         futures = []
         with ThreadPoolExecutor(max_workers=len(self.docker_client.containers.list())) as executor:
             for container in self.docker_client.containers.list():
-                for command in cmd :
-                    futures.append(executor.submit(container.exec_run, docker_cmd(command)))
+                futures.append(executor.submit(task, container))
         wait(futures)
 
     def run(self, debug = False):
