@@ -1,4 +1,6 @@
 from cmd import Cmd
+from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import wait
 from copy import copy
 import io
 from math import ceil
@@ -85,7 +87,7 @@ class DockerBench:
         cmd = [delete_logs, f'({CommandMaker.kill()} || true)']
         cmd = docker_cmd(' && '.join(cmd))
         for container in self.docker_client.containers.list():
-            container.exec_run(docker_cmd(cmd))
+            container.exec_run(cmd)
     
     def _config(self, hosts, node_parameters):
         Print.info('Generating configuration files...')
@@ -176,7 +178,7 @@ class DockerBench:
         duration = bench_parameters.duration
         for _ in progress_bar(range(20), prefix=f'Running benchmark ({duration} sec):'):
             sleep(ceil(duration / 20))
-        self.stop()
+        #self.stop()
 
     def _logs(self, faults):
         # Delete local logs (if any).
@@ -196,7 +198,7 @@ class DockerBench:
     def launch_containers(self, n):
         # Remove the previous service
         self.kill()
-
+        
         # Create and replicate the services
         Print.info(f'Creating service {SERVICE}')                 
         self.docker_client.services.create(
@@ -225,6 +227,8 @@ class DockerBench:
                 elapsed_time += 1
                 if elapsed_time > stop_time:
                     raise Exception('Containers not ready after 120 seconds')
+        
+        self._update()
 
         # traffic control rules
         if self.latency > 0 or self.bandwidth != "":
@@ -232,10 +236,31 @@ class DockerBench:
                 cmd = CommandMaker.tc(self.latency, self.bandwidth)
                 container.exec_run(docker_cmd(cmd))
 
+    def _update(self):
+        Print.info(
+            f'Updating {len(self.docker_client.containers.list())} nodes (branch "{self.settings["branch"]}")...'
+        )
+        cmd = [
+            f'(cd /{self.settings["repo_name"]} && git fetch -f)',
+            f'(cd /{self.settings["repo_name"]} && git checkout -f {self.settings["branch"]})',
+            f'(cd /{self.settings["repo_name"]} && git pull -f)',
+            f'(cd /{self.settings["repo_name"]}/node && {CommandMaker.compile()})',
+            CommandMaker.alias_binaries(
+                f'./{self.settings["repo_name"]}/target/release/'
+            )
+        ]
+        # Run the command in all containers in parallel.
+        futures = []
+        with ThreadPoolExecutor(max_workers=len(self.docker_client.containers.list())) as executor:
+            for container in self.docker_client.containers.list():
+                for command in cmd :
+                    futures.append(executor.submit(container.exec_run, docker_cmd(command)))
+        wait(futures)
+
     def run(self, debug = False):
         assert isinstance(debug, bool)
         Print.heading('Starting remote benchmark')
-
+        
         # Run benchmarks.
         for i, n in enumerate(self.bench_parameters.nodes):
             for r in self.bench_parameters.rate:
@@ -278,4 +303,4 @@ class DockerBench:
                         self.kill()
                         Print.error(BenchError('Benchmark failed', e))
                         continue
-                self.kill()
+                #self.kill()
