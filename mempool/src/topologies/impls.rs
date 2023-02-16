@@ -18,7 +18,7 @@ impl Topology for FullMeshTopology {
                 .find(|(peer_id, _)| peer_id == &self.pub_key)
                 .unwrap();
             // Find the current node
-            let mut tree = Tree::new(key.clone(), addr.clone());
+            let mut tree = Tree::new(*key, *addr);
             // Return all the peers except self
             let children = self
                 .peers
@@ -53,7 +53,7 @@ impl Topology for KauriTopology {
         let mut i = 0;
         let mut res = {
             if id == self.pub_key {
-                Some(root.clone())
+                Some(root)
             } else {
                 None
             }
@@ -68,23 +68,21 @@ impl Topology for KauriTopology {
             let max_fanout = f64::ceil(remaining as f64 / tree_on_level.len() as f64) as usize;
             let curr_fanout = min(self.fanout, max_fanout);
 
-            for elem in 0..tree_on_level.len() {
+            for elem in tree_on_level.iter() {
                 if i >= self.peers.len() || start >= self.peers.len() {
                     break 'building;
                 }
-                let mut tree = tree_on_level[elem].write().unwrap();
+                let mut tree = elem.write().unwrap();
 
                 let children = self.peers[start..min(start + curr_fanout, self.peers.len())]
                     .iter()
-                    .map(|(pub_key, addr)| {
-                        Arc::new(RwLock::new(Tree::new(pub_key.clone(), addr.clone())))
-                    })
+                    .map(|(pub_key, addr)| Arc::new(RwLock::new(Tree::new(*pub_key, *addr))))
                     .collect();
 
                 tree.add_children(children);
 
                 if tree.pub_key == self.pub_key {
-                    res = Some(tree_on_level[elem].clone())
+                    res = Some(elem.clone())
                 }
 
                 start += curr_fanout;
@@ -142,7 +140,7 @@ impl Topology for BinomialTreeTopology {
         }
         base >>= 1;
 
-        let mut node_queue = vec![(root.clone(), 0, base)];
+        let mut node_queue = vec![(root, 0, base)];
 
         while !node_queue.is_empty() {
             let (parent, parent_index, mut bitmask) = node_queue.pop().unwrap();

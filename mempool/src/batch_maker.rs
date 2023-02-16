@@ -83,20 +83,31 @@ async fn wait_block<T>(duration: Duration, value: T) -> T {
     value
 }
 
+pub struct BatchMakerConfig {
+    pub name: PublicKey,
+    pub batch_size: usize,
+    pub max_batch_delay: u64,
+    pub max_hop_delay: u64,
+    pub rx_transaction: Receiver<Transaction>,
+    pub stake_map: Arc<DashMap<Digest, BlockInProcess>>,
+    pub stake: Stake,
+}
+
 impl<T> BatchMaker<T>
 where
     T: Topology,
 {
-    pub fn spawn(
-        name: PublicKey,
-        batch_size: usize,
-        max_batch_delay: u64,
-        max_hop_delay: u64,
-        rx_transaction: Receiver<Transaction>,
-        stake_map: Arc<DashMap<Digest, BlockInProcess>>,
-        mut topology: T,
-        stake: Stake,
-    ) {
+    pub fn spawn(config: BatchMakerConfig, mut topology: T) {
+        let BatchMakerConfig {
+            name,
+            batch_size,
+            max_batch_delay,
+            max_hop_delay,
+            rx_transaction,
+            stake_map,
+            stake,
+        } = config;
+
         let peers = topology.broadcast_peers(name).unwrap();
         info!("Broadcasting batches to {:?}", &peers);
 
