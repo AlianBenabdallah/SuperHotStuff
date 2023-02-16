@@ -7,7 +7,6 @@ In order to run a benchmark on [docker](https://www.docker.com/), please follow 
 - Install docker on every physical machine. 
 - Build the docker image on every physical machine with :
     ```
-    cd benchmark
     docker build -t superhotstuff .
     ```
 - On your main machine, initialize a docker swarm with `docker swarm init`. This command will output a token that you will need in the next step.
