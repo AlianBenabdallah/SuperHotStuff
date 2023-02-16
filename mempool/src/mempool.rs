@@ -1,4 +1,4 @@
-use crate::batch_maker::{BatchMaker, BatchWithSender, Transaction};
+use crate::batch_maker::{BatchMaker, BatchMakerConfig, BatchWithSender, Transaction};
 use crate::config::{Committee, Parameters};
 use crate::helper::Helper;
 use crate::processor::{Processor, SerializedBatchMessage};
@@ -149,16 +149,17 @@ where
         let stake_map = Arc::new(DashMap::new());
 
         // The transactions are sent to the `BatchMaker` that assembles them into batches.
-        BatchMaker::spawn(
-            self.name,
-            self.parameters.batch_size,
-            self.parameters.max_batch_delay,
-            self.parameters.max_hop_delay,
-            /* rx_transaction */ rx_batch_maker,
-            stake_map.clone(),
-            self.topology.clone(),
-            self.committee.stake(&self.name),
-        );
+        let config = BatchMakerConfig {
+            name: self.name,
+            batch_size: self.parameters.batch_size,
+            max_batch_delay: self.parameters.max_batch_delay,
+            max_hop_delay: self.parameters.max_hop_delay,
+            rx_transaction: rx_batch_maker,
+            stake_map: stake_map.clone(),
+            stake: self.committee.stake(&self.name),
+        };
+
+        BatchMaker::spawn(config, self.topology.clone());
 
         // The `QuorumWaiter` broadcasts (in a reliable manner) the batches to all other mempools that
         // share the same `id` as us`. It waits for 2f authorities to acknowledge reception of the batch.

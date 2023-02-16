@@ -24,7 +24,7 @@ async fn handle_clients_transactions() {
     let (_tx_consensus_to_mempool, rx_consensus_to_mempool) = channel(1);
     let (tx_mempool_to_consensus, mut rx_mempool_to_consensus) = channel(1);
     Mempool::spawn(
-        name.clone(),
+        name,
         committee.clone(),
         parameters,
         store,

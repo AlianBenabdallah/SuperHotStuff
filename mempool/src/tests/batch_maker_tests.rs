@@ -11,22 +11,20 @@ async fn make_batch() {
     let sender = keys()[0].0;
     let stake_map = Arc::new(DashMap::new());
     let stake = 0;
-    let topology = FullMeshTopology::new(
-        vec![(sender.clone(), "127.0.0.1:0".parse().unwrap())],
-        sender.clone(),
-    );
+    let topology = FullMeshTopology::new(vec![(sender, "127.0.0.1:0".parse().unwrap())], sender);
+
+    let config = BatchMakerConfig {
+        name: sender,
+        batch_size: 200,
+        max_batch_delay: 1_000_000, // Ensure the timer is not triggered.
+        max_hop_delay: 10000,
+        rx_transaction,
+        stake_map: stake_map.clone(),
+        stake,
+    };
 
     // Spawn a `BatchMaker` instance.
-    BatchMaker::spawn(
-        sender,
-        /* max_batch_size */ 200,
-        /* max_batch_delay */ 1_000_000, // Ensure the timer is not triggered.
-        /*max_hop_delay */ 10000,
-        rx_transaction,
-        stake_map.clone(),
-        topology,
-        stake,
-    );
+    BatchMaker::spawn(config, topology);
 
     // Send enough transactions to seal a batch.
     tx_transaction.send(transaction()).await.unwrap();
@@ -54,22 +52,19 @@ async fn batch_timeout() {
     // Spawn a `BatchMaker` instance.
     let stake_map = Arc::new(DashMap::new());
     let stake = 1;
-    let topology = FullMeshTopology::new(
-        vec![(sender.clone(), "127.0.0.1:0".parse().unwrap())],
-        sender.clone(),
-    );
+    let topology = FullMeshTopology::new(vec![(sender, "127.0.0.1:0".parse().unwrap())], sender);
 
     // Spawn a `BatchMaker` instance.
-    BatchMaker::spawn(
-        sender,
-        /* max_batch_size */ 200,
-        /* max_batch_delay */ 50, // Ensure the timer is triggered.
-        /*max_hop_delay */ 10000,
+    let config = BatchMakerConfig {
+        name: sender,
+        batch_size: 200,
+        max_batch_delay: 50, // Ensure the timer is triggered.
+        max_hop_delay: 10000,
         rx_transaction,
-        stake_map.clone(),
-        topology,
+        stake_map: stake_map.clone(),
         stake,
-    );
+    };
+    BatchMaker::spawn(config, topology);
 
     // Do not send enough transactions to seal a batch..
     tx_transaction.send(transaction()).await.unwrap();

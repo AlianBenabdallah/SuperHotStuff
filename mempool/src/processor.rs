@@ -75,7 +75,7 @@ impl<T: Topology + Send + Sync + 'static> Processor<T> {
     async fn send_ack(&mut self, digest: Digest, source: &PublicKey) {
         let source_addr = self
             .committee
-            .mempool_address(&source)
+            .mempool_address(source)
             .expect("Did not find source");
         let payload = Bytes::from(
             bincode::serialize(&MempoolMessage::Ack((self.name, digest.clone()))).unwrap(),
